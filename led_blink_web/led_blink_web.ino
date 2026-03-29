@@ -11,10 +11,15 @@
  *  1. แก้ไข WIFI_SSID และ WIFI_PASSWORD ให้ตรงกับ WiFi ของคุณ
  *  2. Upload แล้วเปิด Serial Monitor (115200 baud)
  *  3. ดู IP Address แล้วเปิด browser ไปที่ http://<IP>
+ *
+ * โครงสร้างไฟล์:
+ *  led_blink_web.ino  - โค้ดหลัก (WiFi, WebServer, logic)
+ *  html_content.h     - HTML template ของ Dashboard
  */
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include "html_content.h"
 
 // ===== ตั้งค่า WiFi =====
 const char* WIFI_SSID     = "YOUR_SSID";      // ชื่อ WiFi
@@ -26,76 +31,29 @@ const char* WIFI_PASSWORD = "YOUR_PASSWORD";  // รหัส WiFi
 
 WebServer server(80);
 
-bool  blinking   = true;   // สถานะกระพริบ
-int   blinkDelay = DEFAULT_DELAY;
-bool  ledState   = false;
-unsigned long lastBlink = 0;
+bool          blinking   = true;
+int           blinkDelay = DEFAULT_DELAY;
+bool          ledState   = false;
+unsigned long lastBlink  = 0;
 
-// ===== HTML Dashboard =====
+// ===== สร้างหน้า HTML โดยแทนค่า placeholder =====
 String buildPage() {
-  String color  = ledState ? "#00e676" : "#555";
-  String btnTxt = blinking ? "หยุดกระพริบ" : "เริ่มกระพริบ";
-  String btnCol = blinking ? "#e53935" : "#43a047";
+  String page = String(HTML_TEMPLATE);
 
-  String html = R"rawhtml(<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ESP32 LED Dashboard</title>
-  <style>
-    body { font-family: sans-serif; background:#1e1e2e; color:#cdd6f4;
-           display:flex; flex-direction:column; align-items:center;
-           justify-content:center; min-height:100vh; margin:0; }
-    h1   { font-size:1.6rem; margin-bottom:0.3rem; }
-    .card { background:#313244; border-radius:16px; padding:2rem 3rem;
-            text-align:center; box-shadow:0 4px 20px #0006; }
-    .led { width:80px; height:80px; border-radius:50%; margin:1rem auto;
-           background:)rawhtml" + color + R"rawhtml(;
-           box-shadow:0 0 20px )rawhtml" + color + R"rawhtml(; transition:background .3s; }
-    .status { font-size:1.1rem; margin-bottom:1.5rem; }
-    .btn { display:inline-block; padding:.7rem 1.6rem; border-radius:8px;
-           color:#fff; font-size:1rem; text-decoration:none; margin:.4rem;
-           cursor:pointer; border:none; }
-    .btn-toggle { background:)rawhtml" + btnCol + R"rawhtml(; }
-    .speed-box { margin-top:1.2rem; }
-    label { font-size:.9rem; }
-    input[type=range] { width:200px; margin:.5rem 0; }
-    .delay-val { font-weight:bold; color:#89b4fa; }
-    .info { margin-top:1.5rem; font-size:.8rem; color:#888; }
-  </style>
-  <script>
-    setTimeout(() => location.reload(), 2000);
-    function setSpeed(v){
-      document.getElementById('dv').innerText = v + ' ms';
-      fetch('/speed?delay=' + v);
-    }
-  </script>
-</head>
-<body>
-<div class="card">
-  <h1>ESP32 LED Dashboard</h1>
-  <div class="led"></div>
-  <div class="status">สถานะ: <b>)rawhtml" + String(blinking ? "กระพริบ" : "หยุด") + R"rawhtml(</b> |
-    LED: <b>)rawhtml" + String(ledState ? "ON" : "OFF") + R"rawhtml(</b></div>
-  <a class="btn btn-toggle" href="/toggle">)rawhtml" + btnTxt + R"rawhtml(</a>
-  <div class="speed-box">
-    <label>ความเร็ว: <span id="dv" class="delay-val">)rawhtml" + String(blinkDelay) + R"rawhtml( ms</span></label><br>
-    <input type="range" min="100" max="3000" step="100"
-           value=")rawhtml" + String(blinkDelay) + R"rawhtml("
-           onchange="setSpeed(this.value)" oninput="document.getElementById('dv').innerText=this.value+' ms'">
-    <br><small>100 ms = เร็ว &nbsp;|&nbsp; 3000 ms = ช้า</small>
-  </div>
-  <div class="info">ESP32 IP: )rawhtml" + WiFi.localIP().toString() + R"rawhtml(</div>
-</div>
-</body></html>)rawhtml";
+  page.replace("%LED_COLOR%",    ledState   ? "#00e676" : "#555555");
+  page.replace("%BTN_COLOR%",    blinking   ? "#e53935" : "#43a047");
+  page.replace("%BLINK_STATUS%", blinking   ? "กระพริบ" : "หยุด");
+  page.replace("%LED_STATE%",    ledState   ? "ON"      : "OFF");
+  page.replace("%BTN_TEXT%",     blinking   ? "หยุดกระพริบ" : "เริ่มกระพริบ");
+  page.replace("%DELAY_VAL%",    String(blinkDelay));
+  page.replace("%ESP_IP%",       WiFi.localIP().toString());
 
-  return html;
+  return page;
 }
 
 // ===== Route Handlers =====
 void handleRoot() {
-  server.send(200, "text/html", buildPage());
+  server.send(200, "text/html; charset=utf-8", buildPage());
 }
 
 void handleToggle() {
